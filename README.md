@@ -25,7 +25,7 @@ It contains no game files, assets, proprietary SDK files, UE4SS files, AutoHotke
 ## Build
 
 ```powershell
-git clone https://github.com/REPLACE_WITH_YOUR_ACCOUNT/emergency-fast-boot-binary.git
+git clone https://github.com/KamtarGaming/emergency-fast-boot-binary.git
 cd emergency-fast-boot-binary
 .\build.ps1 -Zig 'C:\Tools\zig\zig.exe'
 ```
