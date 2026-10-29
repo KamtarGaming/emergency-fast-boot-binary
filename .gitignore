@@ -1,0 +1,7 @@
+build/
+dist/
+*.dll
+*.exe
+zig-cache/
+zig-global-cache/
+zig-local-cache/
