@@ -127,6 +127,7 @@ static BOOL CALLBACK FindGameWindow(HWND window, LPARAM lParam) {
 static DWORD WINAPI BootstrapThread(LPVOID parameter) {
     DWORD deadline = GetTickCount() + 20000;
     WindowSearch search;
+    HWND startupWindow;
 
     (void)parameter;
     DebugLog(L"bootstrap thread started");
@@ -145,18 +146,19 @@ static DWORD WINAPI BootstrapThread(LPVOID parameter) {
         return 0;
     }
 
-    DebugLog(L"game window found; waiting 10000 ms");
+    startupWindow = search.found;
+    DebugLog(L"startup window found; waiting for Unreal window replacement");
 
-    /* UE has created its game window; wait for the initial UMG screen. */
-    Sleep(10000);
-
-    /* The startup window can be recreated during UE's initialization. */
+    /* Unreal replaces its first startup window before showing the UMG screen. */
     search.found = NULL;
-    deadline = GetTickCount() + 5000;
+    deadline = GetTickCount() + 20000;
     while (search.found == NULL && (LONG)(deadline - GetTickCount()) > 0) {
         EnumWindows(FindGameWindow, (LPARAM)&search);
+        if (search.found == startupWindow) {
+            search.found = NULL;
+        }
         if (search.found == NULL) {
-            Sleep(100);
+            Sleep(50);
         }
     }
 
@@ -164,6 +166,9 @@ static DWORD WINAPI BootstrapThread(LPVOID parameter) {
         DebugLog(L"no game window found after startup transition");
         return 0;
     }
+
+    /* Let the new window finish attaching its startup widget. */
+    Sleep(750);
 
     if (IsWindow(search.found)) {
         DWORD ownerProcess = 0;

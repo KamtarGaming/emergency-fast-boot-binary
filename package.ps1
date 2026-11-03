@@ -33,7 +33,7 @@ foreach ($movie in $movieNames) {
 
 $manifest = [ordered]@{
     name = 'EMERGENCY Fast Boot Binary'
-    version = '1.0.2'
+    version = '1.0.3'
     steamAppId = 850170
     shippingExeSha256 = $expectedShippingExeHash
     dwmapiDllSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $bin 'dwmapi.dll')).Hash
