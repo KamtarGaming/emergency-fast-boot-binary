@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory = $true)]
-    [string]$Zig
+    [string]$Zig,
+    [switch]$Diagnostic
 )
 
 $ErrorActionPreference = 'Stop'
@@ -13,10 +14,15 @@ $previousLocalCache = $env:ZIG_LOCAL_CACHE_DIR
 $env:ZIG_GLOBAL_CACHE_DIR = Join-Path $out 'zig-global-cache'
 $env:ZIG_LOCAL_CACHE_DIR = Join-Path $out 'zig-local-cache'
 
-& $Zig cc -target x86_64-windows-gnu -O2 -static -shared `
-    (Join-Path $root 'src\dwmapi_proxy.c') `
-    -o (Join-Path $out 'dwmapi.dll') `
-    -luser32 -lkernel32
+$compilerArgs = @('-target', 'x86_64-windows-gnu', '-O2', '-static', '-shared')
+if ($Diagnostic) {
+    $compilerArgs += '-DFASTBOOT_DIAGNOSTIC'
+}
+$compilerArgs += @(
+    (Join-Path $root 'src\dwmapi_proxy.c'),
+    '-o', (Join-Path $out 'dwmapi.dll'), '-luser32', '-lkernel32'
+)
+& $Zig cc @compilerArgs
 
 $env:ZIG_GLOBAL_CACHE_DIR = $previousGlobalCache
 $env:ZIG_LOCAL_CACHE_DIR = $previousLocalCache

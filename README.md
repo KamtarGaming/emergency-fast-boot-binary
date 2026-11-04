@@ -12,7 +12,7 @@ It contains no game files, assets, proprietary SDK files, UE4SS files, AutoHotke
 
 ## What the code does
 
-`src/dwmapi_proxy.c` builds a local `dwmapi.dll` proxy. It forwards the four DWM functions imported by the shipping executable to the genuine Windows DLL. During startup it finds the EMERGENCY window, waits for Unreal Engine to complete its startup-window replacement, finds the current game window again, and queues a single Space key event within that game process. The startup photosensitivity screen accepts an ordinary key event.
+`src/dwmapi_proxy.c` builds a local `dwmapi.dll` proxy. It forwards the four DWM functions imported by the shipping executable to the genuine Windows DLL. During startup it detects Unreal Engine's replacement game window and sends short Left-Shift scan-code pulses through Windows' real input queue while that window is active. The photosensitivity warning accepts this standard keyboard key; Left Shift has no action on the title screen.
 
 `package.ps1` generates the mod layout and creates six zero-byte `.bk2` files; these replace the logo videos. It never reads or copies game assets.
 
@@ -44,10 +44,15 @@ The resulting files are:
 dist\
   EMERGENCY\Binaries\Win64\dwmapi.dll
   EMERGENCY\Content\Movies\*.bk2
-  manifest.json
 ```
 
 Zip the **contents** of `dist`, then install by dragging the `EMERGENCY` folder into the game's Steam `common` folder and accepting file replacement.
+
+## Version 1.0.4
+
+- Replaced the unreliable queued window messages with actual keyboard scan-code input, which Unreal Engine receives through its normal input route.
+- Uses Left Shift rather than Space or Escape, so it does not activate a title-screen action or open the pause menu.
+- Confirmed on a fresh launch of the target Steam build.
 
 ## Smoke tests
 

@@ -5,9 +5,10 @@
  * EMERGENCY Fast Boot - local DWMAPI proxy
  *
  * This DLL is intentionally tiny.  It forwards every DWM API imported by the
- * current EMERGENCY shipping executable, then queues one Space key press on
- * that process's first visible top-level window.  EMERGENCY's startup warning
- * accepts any key; Space uses the game's ordinary input route.
+ * current EMERGENCY shipping executable, then injects Left Shift through the real
+ * Windows input queue while the game's own window is foreground.  Unreal does
+ * not consume synthetic WM_KEY* messages for this screen (it uses the raw
+ * input path), so this deliberately uses SendInput instead of PostMessage.
  *
  * The input is queued inside the game process and happens only once per game
  * launch.  It is never sent to another application.
@@ -124,6 +125,31 @@ static BOOL CALLBACK FindGameWindow(HWND window, LPARAM lParam) {
     return FALSE;
 }
 
+/*
+ * The warning accepts any key. The hardware scan-code for Left Shift is used
+ * instead of Space or Escape: it is present on every normal keyboard and has
+ * no EMERGENCY title-screen action.  SendInput is called from inside
+ * EMERGENCY, so the input has the same integrity level as the game.
+ */
+static BOOL SendWarningDismissKey(HWND gameWindow, DWORD processId) {
+    INPUT input[2];
+    DWORD foregroundProcess = 0;
+
+    GetWindowThreadProcessId(GetForegroundWindow(), &foregroundProcess);
+    if (foregroundProcess != processId || !IsWindow(gameWindow)) {
+        return FALSE;
+    }
+
+    ZeroMemory(input, sizeof(input));
+    input[0].type = INPUT_KEYBOARD;
+    input[0].ki.wScan = 0x2A; /* standard PC/AT Left Shift scan-code */
+    input[0].ki.dwFlags = KEYEVENTF_SCANCODE;
+    input[1].type = INPUT_KEYBOARD;
+    input[1].ki.wScan = 0x2A;
+    input[1].ki.dwFlags = KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP;
+    return SendInput(2, input, sizeof(INPUT)) == 2;
+}
+
 static DWORD WINAPI BootstrapThread(LPVOID parameter) {
     DWORD deadline = GetTickCount() + 20000;
     WindowSearch search;
@@ -167,24 +193,23 @@ static DWORD WINAPI BootstrapThread(LPVOID parameter) {
         return 0;
     }
 
-    /* Let the new window finish attaching its startup widget. */
-    Sleep(750);
-
-    if (IsWindow(search.found)) {
-        DWORD ownerProcess = 0;
-        GetWindowThreadProcessId(search.found, &ownerProcess);
-        if (ownerProcess == search.processId) {
-            LPARAM keyDown = 1 | ((LPARAM)0x39 << 16);
-            LPARAM keyUp = keyDown | ((LPARAM)1 << 30) | ((LPARAM)1 << 31);
-            BOOL downPosted = PostMessageW(search.found, WM_KEYDOWN, VK_SPACE, keyDown);
-            BOOL charPosted = PostMessageW(search.found, WM_CHAR, VK_SPACE, 0);
-            BOOL upPosted = PostMessageW(search.found, WM_KEYUP, VK_SPACE, keyUp);
-            DebugLog(downPosted && charPosted && upPosted ? L"Space messages queued" : L"Space message queue failed");
-        } else {
-            DebugLog(L"game window no longer belongs to this process");
+    /*
+     * There is no Windows accessibility/control exposed by an Unreal UMG
+     * widget.  Rather than guessing one delayed press, deliver short physical
+     * input pulses while the new game window is active.  The first pulse that
+     * lands after the warning is constructed dismisses it; the remaining
+     * pulses are Left Shift and harmless on the title screen.
+     */
+    {
+        DWORD end = GetTickCount() + 4000;
+        DWORD sent = 0;
+        while ((LONG)(end - GetTickCount()) > 0 && IsWindow(search.found)) {
+            if (SendWarningDismissKey(search.found, search.processId)) {
+                ++sent;
+            }
+            Sleep(100);
         }
-    } else {
-        DebugLog(L"game window no longer exists");
+        DebugLog(sent != 0 ? L"raw Left Shift input pulses sent" : L"game window was not foreground; no input sent");
     }
 
     return 0;
